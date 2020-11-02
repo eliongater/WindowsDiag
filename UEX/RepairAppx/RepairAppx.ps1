@@ -13,7 +13,7 @@ param (
   [switch]$no_deps = $false
 )
 
-$VERSION =  "v1.9"
+$VERSION =  "v1.10"
 $SLEEP_DELAY =  1000
 $CONFIG_COLUMN_PAD = 60
 $global:mainPFNs = @()
@@ -21,6 +21,7 @@ $global:userRights = $false
 $global:canInstallForAllUsers = $false
 $global:allUsersSwitch = "-AllUsers"
 $global:repairSucceeded = $false
+$global:PackagesToRepair = @()
 
 
 Add-Type -AssemblyName System.ServiceModel
@@ -545,6 +546,16 @@ function SearchForAllUpdates()
       {
         $appUpdate = $appinstalls[$index]
         $packageFamilyName = $appUpdate.PackageFamilyName
+        #Close if open
+        Try{
+          $processes = Get-WmiObject Win32_Process
+          $commandline = (Get-AppxPackage | where packagefamilyname -like "*$packageFamilyName*").installlocation
+          $process = $processes | where {$_.CommandLine -like "*$commandline*"}
+          if($process){
+            Write-Host "Attempting to close if open: $packageFamilyName"
+            $process.Terminate() | out-null
+          }
+        } catch {}
         $status = $appUpdate.GetCurrentStatus()
         $currentstate = [Windows.ApplicationModel.Store.Preview.InstallControl.AppInstallState]$status.InstallState
 
@@ -762,6 +773,7 @@ function VerifyPackagesConsistency()
     {
       "=> PACKAGE INVALID $($pack.Name) expected to sum $expectedPackageSize bytes, but is $realPackageSize bytes $(if ($missingFiles -ne 0) {"with $missingFiles files missing"} else {"with no file missing"})"
       ""
+      $global:PackagesToRepair += $pack.name
       $invalidPackages++
     }
     elseif ($verbose)
@@ -863,6 +875,33 @@ function CheckAdminRights()
   }
 }
 
+function Debloat(){
+    $AppsToRemove = "YourPhone","OneConnect", "synaptics", "FujiXeroxPrintExtension", "VodafoneMobileBroadband", "xbox"
+    Foreach ($app in $AppsToRemove){
+        try{
+            Write-Host "Removing $app"
+            Get-AppxPackage "*$app*" | Remove-AppxPackage
+        } catch {
+        }
+    }
+}
+
+function VerifyAndRepair(){
+  $global:PackagesToRepair = "*calc*","*photos*"
+    VerifyPackagesConsistency
+    if($null -ne $global:PackagesToRepair){
+        foreach ($Package in $Global:PackagesToRepair){
+            $argumentlist = "-action repair $Package"
+            Write-Host "Attempting to repair $Package"
+            try{
+                Start-Process powershell -argumentlist " -command &{`"$PSCommandPath`" $argumentlist}"
+            } catch {
+                & $PSCommandPath -action repair $Package
+            }
+        }
+    }
+}
+
 
 ""
 "RepairAppx $VERSION - Repair & troubleshooting tool for AppX packages"
@@ -876,7 +915,9 @@ CheckAdminRights
 switch ( $action )
 {
   "config"      { CheckConfig; exit }
+  "fixit"       { VerifyAndRepair; SearchForAllUpdates; VerifyAndRepair; SearchForAllUpdates; Debloat; exit}
   "verify"      { VerifyPackagesConsistency; exit }
+  "verifyrepair"{ VerifyAndRepair; exit }
   "setstate"    { SetPackageToModifiedState; exit }
   "resetstate"  { ClearPackageFromModifiedState; exit }
   "depends"     { LookForDependencies; LookForDependees; exit }
