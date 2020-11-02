@@ -22,6 +22,7 @@ This script can help you  to investigate and fix some of those situations, letti
 - *verify* packages: Compare packages files size with AppxBlockMap.xml manifests, to look for corrupted packages
 - *repair* packages: Automate Windows Update to try to force re-downloading installed apps with their frameworks
 - *register* packages: Register packages and its frameworks (dependencies) for the current user profile
+- *verifyrepair* packages: Verifies and then attempts to repair any corrupted packages
 - Set the package state: *setstate* of packages to mark them as "Modified" or *resetstate* ("This app can't open" errors)
 - Script Windows Update: Trigger a Windows *update* scan, or *cancel* current active download queue
 - Gather Config details: Dumps *config* like GPOs and service states related to the Store and Windows Update
@@ -114,7 +115,7 @@ Please let us know your success or issues using this tool!​
 
 
 # Version
-Latest script version is 1.9
+Latest script version is 1.10
 
 # Disclaimer
 
